@@ -1,0 +1,138 @@
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name: 
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: ["user", "admin"]
+      example:
+        id: 67bf21eba9211b471af168b7
+        email: test@example.com
+        name: John Doe
+        role: user
+
+    Token:
+      type: object
+      properties:
+        token:
+          type: string
+        expires: 
+          type: string
+          format: date-time
+      example:
+        token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2N2JmMjFlYmE5MjExYjQ3MWFmMTY4YjciLCJpYXQiOjE3NDA2MDYwNjEsImV4cCI6MTc0MzE5ODA2MSwidHlwZSI6InJlZnJlc2gifQ.GsZ-udPl6KNnbLSx_QPNr8BTFB_qrY1RcuiTOsihgCw
+        expires: 2025-02-27T16:20:57.793Z
+
+    AuthTokens:
+      type: object
+      properties:
+        access:
+          $ref: '#/components/schemas/Token'
+        refresh:
+          $ref: '#/components/schemas/Token'
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        createdBy:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: ["pending", "in-progress", "completed"]
+        priority:
+          type: string
+          enum: ["low", "medium", "high"]
+        dueDate:
+          type: string
+          format: date-time
+        comments:
+          type: array
+          items:
+            type: string
+        category:
+          type: string
+      example:
+        id: 91acbd34fa9211b471af1234
+        createdBy: 67bf21eba9211b471af168b7
+        title: "Fix authentication bug"
+        description: "Investigate and fix the issue with JWT expiration."
+        status: "in-progress"
+        priority: "high"
+        dueDate: "2025-03-01T12:00:00Z"
+        comments: ["Looking into this", "Found the root cause"]
+        category: "Bug"
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: number
+        message:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Duplicate
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 400
+            message: Duplicate
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 401
+            message: Please authenticate
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 403
+            message: Forbidden
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 404
+            message: Not Found
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 500
+            message: Internal Server Error
+
+  securitySchemes:  # ✅ Correct Placement
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

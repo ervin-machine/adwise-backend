@@ -1,0 +1,3 @@
+"_id","createdBy","campaignName","campaignType","budget","startDate","endDate","targeting","clicks","ctr","impressions","spend","status","performance","createdAt","updatedAt","__v"
+"683aef716bb3fd65b0c86438","68331b79f0d10750b78cc5ea","Testiraenj","Search","123","2025-06-04","2025-06-07","age: undefined - undefined locations: undefined interests: undefined","0","0","0","0","active","0","2025-05-31T12:00:49.948Z","2025-05-31T12:00:49.948Z",0
+"683aee006bb3fd65b0c863d7","68331b79f0d10750b78cc5ea","Test","Search","123","2025-06-01","2025-06-03","age: undefined - undefined locations: undefined interests: undefined","0","0","0","0","active","0","2025-05-31T11:54:40.338Z","2025-05-31T11:54:40.338Z",0
