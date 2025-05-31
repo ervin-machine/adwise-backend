@@ -38,7 +38,11 @@ const startServer = async () => {
 
     // enable cors
     app.use(cors({
-      origin: 'https://adwise-frontend-sand.vercel.app/',  // frontend URL
+      origin: [
+        'https://adwise-frontend-sand.vercel.app',
+        'http://localhost:3000'
+      ],
+        // frontend URL
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       credentials: true, // if you use cookies/auth headers
     }));
