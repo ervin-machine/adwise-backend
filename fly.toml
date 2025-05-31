@@ -1,15 +1,12 @@
-# fly.toml app configuration file generated for task-manager-app-pidxfq on 2025-05-07T19:09:31Z
+# fly.toml app configuration file generated for adwise-backend on 2025-05-31T12:26:29Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'task-manager-app-pidxfq'
+app = 'adwise-backend'
 primary_region = 'fra'
 
 [build]
-
-[env]
-  PORT = '8080'
 
 [http_service]
   internal_port = 8080
