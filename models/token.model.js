@@ -15,12 +15,13 @@ const tokenSchema = mongoose.Schema(
     },
     type: {
       type: String,
-      enum: [tokenTypes.REFRESH],
+      enum: [tokenTypes.REFRESH, tokenTypes.RESET_PASSWORD],
       required: true,
     },
     expires: {
       type: Date,
       required: true,
+      expires: 0,
     },
     blacklisted: {
       type: Boolean,

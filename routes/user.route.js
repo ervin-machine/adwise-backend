@@ -8,7 +8,15 @@ const router = express.Router();
 
 router
   .route('/')
+  .get(auth('getUsers'), validate(userValidation.getUsers), userController.getUsers)
   .post(auth('manageUsers'), validate(userValidation.createUser), userController.createUser)
+
+router.patch(
+  '/me/ads-connection',
+  auth(),
+  validate(userValidation.updateAdsConnection),
+  userController.updateAdsConnection
+);
 
 router
   .route('/:userId')

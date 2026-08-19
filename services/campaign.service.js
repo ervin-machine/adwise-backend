@@ -4,24 +4,11 @@ const { Campaign } = require('../models');
 const axios = require('axios')
 const { Parser } = require('json2csv');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
-const { GoogleAdsApi, resources,
-  enums,
-  toMicros,
-  ResourceNames,
-  MutateOperation, } = require("google-ads-api");
-
-const client = new GoogleAdsApi({
-  client_id: process.env.CLIENT_ID,
-  client_secret: process.env.CLIENT_SECRET,
-  developer_token: process.env.DEVELOPER_TOKEN,
-});
-
-const customer = client.Customer({
-  customer_id: "2565974735",
-  login_customer_id: process.env.LOGIN_CUSTOMER_ID,
-  refresh_token: process.env.REFRESH_TOKEN,
-});
+const { nanoid } = require('nanoid');
+const { enums, toMicros, ResourceNames } = require("google-ads-api");
+const { customer } = require('./googleAdsClient');
 
 function mapAgeRange(minAge, maxAge) {
   const ageEnums = [];
@@ -101,8 +88,9 @@ const createCampaign = async (campaignBody) => {
             enhanced_cpc_enabled: false,
           },
           campaign_budget: budgetResourceName,
-          start_date: "2025-06-10",
-          end_date: "2025-06-30",
+          start_date: campaignBody.startDate,
+          end_date: campaignBody.endDate,
+          contains_eu_political_advertising: enums.EuPoliticalAdvertisingStatus.DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING,
           network_settings: {
             target_google_search: true,
             target_search_network: true,
@@ -165,44 +153,21 @@ const createCampaign = async (campaignBody) => {
     
     // Final API call to Google Ads
     const result = await customer.mutateResources(operations);
-    
-    
-    const campaign = await Campaign.create(campaignBody)
+    const campaignResult = result.mutate_operation_responses?.find(
+      (r) => r.response === 'campaign_result'
+    );
+    const googleAdsCampaignId = campaignResult?.campaign_result?.resource_name?.split('/').pop();
+
+    const campaign = await Campaign.create({ ...campaignBody, googleAdsCampaignId })
     return campaign
   } catch(err) {
-    console.log(err)
+    const adsMessage = err.errors?.map((e) => e.message).join('; ') || err.message;
+    throw new ApiError(status.BAD_GATEWAY, adsMessage || 'Failed to create campaign in Google Ads');
   }
-  
 };
 
 const getCampaigns = async (userId) => {
-  try {
-
-
-const campaigns = await customer.report({
-  entity: "campaign",
-  attributes: [
-    "campaign.id",
-    "campaign.name",
-    "campaign.bidding_strategy_type",
-    "campaign_budget.amount_micros",
-  ],
-  metrics: [
-    "metrics.cost_micros",
-    "metrics.clicks",
-    "metrics.impressions",
-    "metrics.all_conversions",
-  ],
-  constraints: {
-    "campaign.status": enums.CampaignStatus.ENABLED,
-  },
-  limit: 20,
-});
-  console.log(campaigns)
-    return campaigns
-  } catch (err) {
-    console.error("Error in getCampaigns:", err);
-  }
+  return Campaign.find({ createdBy: userId }).sort({ createdAt: -1 });
 };
 
   
@@ -211,12 +176,11 @@ const campaigns = await customer.report({
   };
   
   const updateCampaignById = async (campaignId, updateBody) => {
-    console.log(campaignId, updateBody)
     const campaign = await getCampaignById(campaignId);
     if (!campaign) {
       throw new ApiError(status.NOT_FOUND, 'Campaign not found');
     }
-    Object.assign(campaign, updateBody.updatedCampaign);
+    Object.assign(campaign, updateBody);
     await campaign.save();
     return campaign;
   };
@@ -252,6 +216,7 @@ Return strictly and only a raw JSON object with the following keys:
 }
 `;
 
+  let result;
   try {
     const response = await axios.post('https://api.openai.com/v1/chat/completions', {
       model: "gpt-4",
@@ -267,21 +232,30 @@ Return strictly and only a raw JSON object with the following keys:
       }
     });
 
-    const result = response.data.choices[0].message.content;
-    console.log("Generated Campaign:", JSON.parse(result));
-    return result
-
+    result = response.data.choices[0].message.content;
   } catch (error) {
-    console.error("Error generating campaign:", error.response?.data || error.message);
+    throw new ApiError(
+      status.BAD_GATEWAY,
+      error.response?.data?.error?.message || 'Failed to generate campaign with AI'
+    );
+  }
+
+  try {
+    return JSON.parse(result);
+  } catch (error) {
+    throw new ApiError(status.BAD_GATEWAY, 'AI returned a response that could not be parsed');
   }
   }
 
   const exportToCsv = (campaigns) => {
     const json2csvParser = new Parser();
-    console.log(campaigns)
     const csv = json2csvParser.parse(campaigns)
 
-    const filePath = path.join(__dirname, 'campaigns-report.csv');
+    // A unique filename in the OS temp dir, not the source tree - writing into
+    // services/ meant concurrent exports could race and overwrite each other,
+    // and it wouldn't be writable at all once the container runs as a
+    // non-root user with a read-only app directory.
+    const filePath = path.join(os.tmpdir(), `campaigns-report-${nanoid()}.csv`);
     fs.writeFileSync(filePath, csv);
     return filePath;
   }

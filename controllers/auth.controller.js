@@ -5,15 +5,22 @@ const { tokenTypes } = require('../config/tokens');
 const { Token } = require('../models');
 const { NODE_ENV } = require("../config/dotenv")
 
+// SameSite=None is required for the cookie to be sent on cross-site requests
+// (the deployed frontend and backend live on different domains), but
+// SameSite=None is only valid together with Secure, which needs real HTTPS -
+// so it only applies in production. Locally, frontend and backend are both
+// on localhost (different ports, same site), where Strict already works.
+const refreshCookieOptions = {
+  httpOnly: true,
+  secure: NODE_ENV === "production",
+  sameSite: NODE_ENV === "production" ? "None" : "Strict",
+};
+
 const register = catchAsync(async (req, res) => {
   const user = await userService.createUser(req.body);
   const tokens = await tokenService.generateAuthTokens(user);
 
-  res.cookie("refreshToken", tokens.refresh.token, {
-    httpOnly: true,
-    secure: NODE_ENV === "production",
-    sameSite: "Strict",
-  });
+  res.cookie("refreshToken", tokens.refresh.token, refreshCookieOptions);
 
   res.status(status.CREATED).send({ user, tokens });
 });
@@ -24,11 +31,7 @@ const login = catchAsync(async (req, res) => {
   const user = await authService.loginUserWithEmailAndPassword(email, password);
   const tokens = await tokenService.generateAuthTokens(user);
 
-  res.cookie("refreshToken", tokens.refresh.token, {
-    httpOnly: true,
-    secure: NODE_ENV === "production",
-    sameSite: "Strict",
-  });
+  res.cookie("refreshToken", tokens.refresh.token, refreshCookieOptions);
 
   res.send({ user, tokens });
 });
@@ -38,11 +41,7 @@ const googleLogin = catchAsync(async (req, res) => {
     const user = await authService.loginWithGoogleAuth(credential);
     const tokens = await tokenService.generateAuthTokens(user);
 
-    res.cookie("refreshToken", tokens.refresh.token, {
-      httpOnly: true,
-      secure: NODE_ENV === "production",
-      sameSite: "Strict",
-    });
+    res.cookie("refreshToken", tokens.refresh.token, refreshCookieOptions);
     res.send({ user, tokens });
 })
 
@@ -82,21 +81,25 @@ const getMe = catchAsync(async (req, res) => {
   const user = await userService.getUserById(tokenDoc.user);
   const newTokens = await tokenService.generateAuthTokens(user);
 
-  res.cookie("refreshToken", newTokens.refresh, {
-      httpOnly: true,
-      secure: NODE_ENV === "production",
-      sameSite: "Strict",
-  });
+  res.cookie("refreshToken", newTokens.refresh.token, refreshCookieOptions);
 
   res.json({ user, accessToken: newTokens.access.token });
 });
 
 const updateUser = catchAsync(async (req, res) => {
   const user = await userService.updateUserById(req.params.userId, req.body);
-  res.send(user);
+  res.send({ user });
 });
 
+const forgotPassword = catchAsync(async (req, res) => {
+  await authService.forgotPassword(req.body.email);
+  res.status(status.NO_CONTENT).send();
+});
 
+const resetPassword = catchAsync(async (req, res) => {
+  await authService.resetPassword(req.body.token, req.body.password);
+  res.status(status.NO_CONTENT).send();
+});
 
 module.exports = {
   register,
@@ -105,5 +108,7 @@ module.exports = {
   refreshTokens,
   getMe,
   googleLogin,
-  updateUser
+  updateUser,
+  forgotPassword,
+  resetPassword,
 };

@@ -5,6 +5,9 @@ const campaignSchema = mongoose.Schema(
     createdBy: {
       type: String
     },
+    googleAdsCampaignId: {
+      type: String,
+    },
     campaignName: {
       type: String,
       required: true,
@@ -30,9 +33,11 @@ const campaignSchema = mongoose.Schema(
         required: true,
         trim: true,
       },
+    // Not required: the current CampaignForm only sends targetingInfo (a
+    // structured object below on the Google Ads mutation itself), not this
+    // flat field. Kept for backward compatibility with any older records.
     targeting: {
       type: String,
-      required: true,
       trim: true,
     },
     clicks: {

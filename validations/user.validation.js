@@ -47,10 +47,17 @@ const deleteUser = {
   }),
 };
 
+const updateAdsConnection = {
+  body: Joi.object().keys({
+    connected: Joi.boolean().required(),
+  }),
+};
+
 module.exports = {
   createUser,
   getUsers,
   getUser,
   updateUser,
   deleteUser,
+  updateAdsConnection,
 };

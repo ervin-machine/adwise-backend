@@ -1,7 +1,12 @@
 const { status } = require('http-status')
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
-const { JWT_SECRET, JWT_ACCESS_EXPIRATION_MINUTES, JWT_REFRESH_EXPIRATION_DAYS } = require('../config/dotenv');
+const {
+  JWT_SECRET,
+  JWT_ACCESS_EXPIRATION_MINUTES,
+  JWT_REFRESH_EXPIRATION_DAYS,
+  JWT_RESET_PASSWORD_EXPIRATION_MINUTES,
+} = require('../config/dotenv');
 const { Token } = require('../models');
 const { tokenTypes } = require('../config/tokens');
 const { userService } = require("../services")
@@ -69,6 +74,13 @@ const generateAccessToken = async (user) => {
   };
 };
 
+const generateResetPasswordToken = async (user) => {
+  const expires = moment().add(JWT_RESET_PASSWORD_EXPIRATION_MINUTES, 'minutes');
+  const resetPasswordToken = generateToken(user.id, expires, tokenTypes.RESET_PASSWORD);
+  await saveToken(resetPasswordToken, user.id, expires, tokenTypes.RESET_PASSWORD);
+  return resetPasswordToken;
+};
+
 const isTokenExpired = (tokenDoc) => {
   const decoded = jwt.decode(tokenDoc.token);
   if (!decoded || !decoded.exp) return true;
@@ -78,6 +90,9 @@ const isTokenExpired = (tokenDoc) => {
 };
 
 const getTokenDoc = async (refreshToken) => {
+   if (!refreshToken) {
+    throw new ApiError(status.UNAUTHORIZED, "Refresh token not found");
+   }
 
    const tokenDoc = await Token.findOne({ token: refreshToken, type: tokenTypes.REFRESH });
 
@@ -91,6 +106,10 @@ const getTokenDoc = async (refreshToken) => {
 const deleteDoc = async (refreshToken) => {
   const tokenDoc = await Token.findOne({ token: refreshToken, type: tokenTypes.REFRESH });
 
+  if (!tokenDoc) {
+    throw new ApiError(status.UNAUTHORIZED, "Refresh token not found");
+  }
+
   await tokenDoc.deleteOne();
 }
 
@@ -99,6 +118,7 @@ module.exports = {
   saveToken,
   verifyToken,
   generateAuthTokens,
+  generateResetPasswordToken,
   isTokenExpired,
   generateAccessToken,
   getTokenDoc,

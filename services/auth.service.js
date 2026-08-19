@@ -1,6 +1,7 @@
 const { status } = require('http-status');
 const tokenService = require('./token.service');
 const userService = require('./user.service');
+const emailService = require('./email.service');
 const Token = require('../models/token.model');
 const ApiError = require('../utils/ApiError');
 const { tokenTypes } = require('../config/tokens');
@@ -60,6 +61,10 @@ const logout = async (refreshToken) => {
 };
 
 const refreshAuth = async (refreshToken) => {
+  if (!refreshToken) {
+    throw new ApiError(status.UNAUTHORIZED, "Refresh token not found");
+  }
+
   const tokenDoc = await Token.findOne({ token: refreshToken, type: tokenTypes.REFRESH });
 
   if (!tokenDoc) {
@@ -68,19 +73,52 @@ const refreshAuth = async (refreshToken) => {
 
   if (!tokenService.isTokenExpired(tokenDoc)) {
       const user = await userService.getUserById(tokenDoc.user);
-      const accessToken = tokenService.generateAccessToken(user);
-      return { access: accessToken, refresh: refreshToken };
+      const { access } = await tokenService.generateAccessToken(user);
+      return { access, refresh: { token: refreshToken, expires: tokenDoc.expires } };
   }
 
-  await tokenDoc.remove();
+  await tokenDoc.deleteOne();
   const user = await userService.getUserById(tokenDoc.user);
   const newTokens = await tokenService.generateAuthTokens(user);
   return newTokens;
+};
+
+const forgotPassword = async (email) => {
+  const user = await userService.getUserByEmail(email);
+
+  // Don't reveal whether the account exists - always resolve the same way.
+  if (!user || user.isOAuthUser) {
+    return;
+  }
+
+  const resetPasswordToken = await tokenService.generateResetPasswordToken(user);
+  await emailService.sendResetPasswordEmail(user.email, resetPasswordToken);
+};
+
+const resetPassword = async (resetPasswordToken, newPassword) => {
+  let tokenDoc;
+  try {
+    tokenDoc = await tokenService.verifyToken(resetPasswordToken, tokenTypes.RESET_PASSWORD);
+  } catch (err) {
+    throw new ApiError(status.UNAUTHORIZED, 'Password reset failed: invalid or expired token');
+  }
+
+  const user = await userService.getUserById(tokenDoc.user);
+  if (!user) {
+    throw new ApiError(status.UNAUTHORIZED, 'Password reset failed');
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  await Token.deleteMany({ user: user.id, type: tokenTypes.RESET_PASSWORD });
 };
 
 module.exports = {
   loginUserWithEmailAndPassword,
   logout,
   refreshAuth,
-  loginWithGoogleAuth
+  loginWithGoogleAuth,
+  forgotPassword,
+  resetPassword,
 };

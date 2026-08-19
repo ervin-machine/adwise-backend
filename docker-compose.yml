@@ -1,0 +1,133 @@
+services:
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    container_name: stacklyhub-db
+    env_file: .env
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # All *.sql files in migrations/ are executed in alphabetical order
+      # on first container start (when the data volume is empty).
+      - ./backend/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  # ── Reverse Proxy ───────────────────────────────────────────────────────────────────
+  caddy:
+    image: caddy:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "3001:3001"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    networks:
+      - web
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: stacklyhub-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+
+  # ── Acceptance Boundary Assisstant ───────────────────────────────────────────────────
+  acceptance_boundary_assisstant:
+    build:
+      context: ./apps/acceptance-boundary-assisstant-backend
+      dockerfile: Dockerfile
+    container_name: aba-backend
+    env_file:
+      - ./apps/acceptance-boundary-assisstant-backend/.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/acceptance_boundary_assistant
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGIN: ${CORS_ORIGIN}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend_logs:/app/logs
+    networks:
+      - backend
+      - web
+    restart: always
+
+  # ── MongoDB (Adwise) ────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    restart: always
+    container_name: adwise-mongo
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  # ── Adwise Backend ──────────────────────────────────────────────────────────
+  adwise-backend:
+    build:
+      context: ./apps/adwise-backend
+      dockerfile: Dockerfile
+    container_name: adwise-backend
+    env_file:
+      - ./apps/adwise-backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      # Overrides whatever MONGO_URI is in the app's own .env (that one's for
+      # running it directly on a host, where "mongo" isn't resolvable).
+      MONGO_URI: mongodb://mongo:27017/adwise
+    ports:
+      - "5000:5000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - backend
+      - web
+    restart: always
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_logs:
+  caddy_data:
+  mongo_data:
+
+networks:
+  backend:
+  web:

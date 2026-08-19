@@ -1,0 +1,26 @@
+node_modules
+npm-debug.log
+
+# Secrets - never bake these into an image layer
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+
+# Dev/test-only, excluded from the runtime image (npm ci --omit=dev skips
+# their packages anyway)
+tests
+jest.config.js
+coverage
+
+# Not needed inside the image itself
+Dockerfile
+docker-compose.yml
+Caddyfile
+fly.toml
+*.md
+
+.vscode
+.idea

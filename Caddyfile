@@ -1,0 +1,7 @@
+acceptance-boundary-assistant.duckdns.org {
+    reverse_proxy acceptance_boundary_assisstant:3000
+}
+
+adwise.duckdns.org {
+    reverse_proxy adwise-backend:5000
+}

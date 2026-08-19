@@ -1,7 +1,8 @@
 const { status } = require('http-status');
+const fs = require('fs');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
-const { campaignService } = require('../services');
+const { campaignService, metricsService } = require('../services');
 
 const createCampaign = catchAsync(async (req, res) => {
   const campaign = await campaignService.createCampaign(req.body);
@@ -36,12 +37,26 @@ const generateGoogleAdsCampaign = catchAsync(async (req, res) => {
   res.status(status.CREATED).send(generatedAd);
 });
 
+const syncMetrics = catchAsync(async (req, res) => {
+  const result = await metricsService.syncCampaignMetrics();
+  res.status(status.OK).send(result);
+});
+
+const getMetrics = catchAsync(async (req, res) => {
+  const days = req.query.days ? Number(req.query.days) : 30;
+  const series = await metricsService.getMetricsSeries(req.user.id, days);
+  res.status(status.OK).send(series);
+});
+
 const exportToCsv = catchAsync((req, res) => {
   const report = campaignService.exportToCsv(req.body);
   res.download(report, 'campaigns-report.csv', (err) => {
+    fs.unlink(report, () => {});
     if (err) {
       console.error('Error sending file:', err);
-      res.status(500).send('Failed to send CSV');
+      if (!res.headersSent) {
+        res.status(500).send('Failed to send CSV');
+      }
     }
   })
 });
@@ -53,5 +68,7 @@ module.exports = {
   updateCampaign,
   deleteCampaign,
   generateGoogleAdsCampaign,
+  syncMetrics,
+  getMetrics,
   exportToCsv
 };

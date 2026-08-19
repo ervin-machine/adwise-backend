@@ -10,8 +10,8 @@ const createUser = async (userBody) => {
   return User.create(userBody);
 };
 
-const getUsers = async () => {
-  const users = await User.find().sort({ createdAt: -1 });;
+const getUsers = async (filter, options) => {
+  const users = await User.paginate(filter, options);
   return users;
 };
 
@@ -41,7 +41,17 @@ const deleteUserById = async (userId) => {
   if (!user) {
     throw new ApiError(status.NOT_FOUND, 'User not found');
   }
-  await user.remove();
+  await user.deleteOne();
+  return user;
+};
+
+const setAdsConnection = async (userId, connected) => {
+  const user = await getUserById(userId);
+  if (!user) {
+    throw new ApiError(status.NOT_FOUND, 'User not found');
+  }
+  user.connectedAds = connected;
+  await user.save();
   return user;
 };
 
@@ -52,4 +62,5 @@ module.exports = {
   getUserByEmail,
   updateUserById,
   deleteUserById,
+  setAdsConnection,
 };
