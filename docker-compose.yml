@@ -111,8 +111,10 @@ services:
       # Overrides whatever MONGO_URI is in the app's own .env (that one's for
       # running it directly on a host, where "mongo" isn't resolvable).
       MONGO_URI: mongodb://mongo:27017/adwise
-    ports:
-      - "5000:5000"
+    # No host port published - Caddy reaches this over the internal "web"
+    # network by service name (adwise-backend:5000), so nothing outside
+    # Docker needs a host port mapping. Avoids fighting other services for
+    # a free port, and means the API is only reachable through Caddy/TLS.
     depends_on:
       mongo:
         condition: service_healthy

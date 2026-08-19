@@ -24,6 +24,7 @@ app.use(compression());
 app.use(cors({
   origin: [
     'https://adwise-frontend-sand.vercel.app',
+    'https://adwise.stacklyhub.com',
     'http://localhost:3000'
   ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
