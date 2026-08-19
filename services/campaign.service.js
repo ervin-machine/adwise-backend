@@ -34,11 +34,20 @@ function mapAgeRange(minAge, maxAge) {
   return ageEnums;
 }
 
+// AgeRange criteria use Google's fixed, predefined criterion IDs (not
+// arbitrary temporary ones like other resources in a mutate call) - these
+// are stable constants documented in the Google Ads API, one per age bucket.
+const AGE_RANGE_CRITERION_ID = {
+  [enums.AgeRangeType.AGE_18_24]: '503001',
+  [enums.AgeRangeType.AGE_25_34]: '503002',
+  [enums.AgeRangeType.AGE_35_44]: '503003',
+  [enums.AgeRangeType.AGE_45_54]: '503004',
+  [enums.AgeRangeType.AGE_55_64]: '503005',
+  [enums.AgeRangeType.AGE_65_UP]: '503006',
+};
+
 const createCampaign = async (campaignBody) => {
   try {
-    const parsedLocations = campaignBody.targetingInfo.location
-    .split(',')
-    .map(id => id.trim());
     const budgetResourceName = ResourceNames.campaignBudget(
       customer.credentials.customer_id,
       "-1"
@@ -111,24 +120,36 @@ const createCampaign = async (campaignBody) => {
         },
       },
     
-      // 4. Dynamic Location Targeting
+      // 4. Location Targeting - campaign-level, not ad-group-level. Ad-group-level
+      // location criteria now require "AI Max" to be enabled on the campaign;
+      // campaign-level targeting is the standard, unrestricted approach.
       ...locationList.map((locCode) => ({
-        entity: "ad_group_criterion",
+        entity: "campaign_criterion",
         operation: "create",
         resource: {
-          ad_group: adGroupResourceName,
+          resource_name: ResourceNames.campaignCriterion(
+            customer.credentials.customer_id,
+            "-2",
+            locCode
+          ),
+          campaign: campaignResourceName,
           location: {
             geo_target_constant: `geoTargetConstants/${locCode}`,
           },
-          status: enums.AdGroupCriterionStatus.ENABLED,
+          status: enums.CampaignCriterionStatus.ENABLED,
         },
       })),
-    
+
       // 5. Age Ranges (based on min and max age)
       ...mapAgeRange(age?.min, age?.max).map((ageEnum) => ({
         entity: "ad_group_criterion",
         operation: "create",
         resource: {
+          resource_name: ResourceNames.adGroupCriterion(
+            customer.credentials.customer_id,
+            "-3",
+            AGE_RANGE_CRITERION_ID[ageEnum]
+          ),
           ad_group: adGroupResourceName,
           age_range: {
             type: ageEnum,
@@ -136,15 +157,21 @@ const createCampaign = async (campaignBody) => {
           status: enums.AdGroupCriterionStatus.ENABLED,
         },
       })),
-    
-      // 6. Interests (userInterestConstants/ID)
-      ...interests.map((interestId) => ({
+
+      // 6. Interests - user_interest_category takes the full resource name
+      // (customers/{id}/userInterests/{id}), not the bare constant.
+      ...interests.map((interestId, index) => ({
         entity: "ad_group_criterion",
         operation: "create",
         resource: {
+          resource_name: ResourceNames.adGroupCriterion(
+            customer.credentials.customer_id,
+            "-3",
+            `-${4 + index}`
+          ),
           ad_group: adGroupResourceName,
           user_interest: {
-            user_interest_category: `userInterestConstants/${interestId}`,
+            user_interest_category: `customers/${customer.credentials.customer_id}/userInterests/${interestId}`,
           },
           status: enums.AdGroupCriterionStatus.ENABLED,
         },
