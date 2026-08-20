@@ -158,9 +158,12 @@ const createCampaign = async (campaignBody) => {
         },
       })),
 
-      // 6. Interests - user_interest_category takes the full resource name
-      // (customers/{id}/userInterests/{id}), not the bare constant.
-      ...interests.map((interestId, index) => ({
+      // 6. Interests - these are free-text terms (from the form or the AI
+      // generator), not Google's fixed user-interest-category taxonomy IDs,
+      // so they're created as keyword criteria rather than user_interest
+      // audience criteria (which require real numeric category IDs and
+      // reject arbitrary text with an "invalid resource name" error).
+      ...interests.map((keywordText, index) => ({
         entity: "ad_group_criterion",
         operation: "create",
         resource: {
@@ -170,8 +173,9 @@ const createCampaign = async (campaignBody) => {
             `-${4 + index}`
           ),
           ad_group: adGroupResourceName,
-          user_interest: {
-            user_interest_category: `customers/${customer.credentials.customer_id}/userInterests/${interestId}`,
+          keyword: {
+            text: keywordText,
+            match_type: enums.KeywordMatchType.BROAD,
           },
           status: enums.AdGroupCriterionStatus.ENABLED,
         },
