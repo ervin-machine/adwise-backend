@@ -27,6 +27,11 @@ const updateCampaign = catchAsync(async (req, res) => {
   res.send(campaign);
 });
 
+const updateCampaignStatus = catchAsync(async (req, res) => {
+  const campaign = await campaignService.setCampaignStatus(req.params.campaignId, req.body.status);
+  res.send(campaign);
+});
+
 const deleteCampaign = catchAsync(async (req, res) => {
   await campaignService.deleteCampaignById(req.params.campaignId);
   res.status(status.NO_CONTENT).send();
@@ -66,6 +71,7 @@ module.exports = {
   getCampaigns,
   getCampaign,
   updateCampaign,
+  updateCampaignStatus,
   deleteCampaign,
   generateGoogleAdsCampaign,
   syncMetrics,

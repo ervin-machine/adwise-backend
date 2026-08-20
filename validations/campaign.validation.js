@@ -71,6 +71,15 @@ const updateCampaign = {
     .min(1),
 };
 
+const updateCampaignStatus = {
+  params: Joi.object().keys({
+    campaignId: Joi.string().custom(objectId),
+  }),
+  body: Joi.object().keys({
+    status: Joi.string().valid('active', 'paused').required(),
+  }),
+};
+
 const deleteCampaign = {
   params: Joi.object().keys({
     campaignId: Joi.string().custom(objectId),
@@ -99,6 +108,7 @@ module.exports = {
   getCampaigns,
   getCampaign,
   updateCampaign,
+  updateCampaignStatus,
   deleteCampaign,
   generateGoogleAdsCampaign,
   exportToCsv,

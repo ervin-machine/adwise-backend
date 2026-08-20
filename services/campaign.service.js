@@ -211,7 +211,43 @@ const getCampaigns = async (userId) => {
     await campaign.save();
     return campaign;
   };
-  
+
+  // Pausing/resuming updates the real Google Ads campaign too, not just our
+  // own record - otherwise the button would just be a cosmetic label with no
+  // effect on whether the campaign is actually spending money.
+  const setCampaignStatus = async (campaignId, newStatus) => {
+    const campaign = await getCampaignById(campaignId);
+    if (!campaign) {
+      throw new ApiError(status.NOT_FOUND, 'Campaign not found');
+    }
+
+    if (campaign.googleAdsCampaignId) {
+      const googleStatus = newStatus === 'paused' ? enums.CampaignStatus.PAUSED : enums.CampaignStatus.ENABLED;
+      try {
+        await customer.mutateResources([
+          {
+            entity: 'campaign',
+            operation: 'update',
+            resource: {
+              resource_name: ResourceNames.campaign(
+                customer.credentials.customer_id,
+                campaign.googleAdsCampaignId
+              ),
+              status: googleStatus,
+            },
+          },
+        ]);
+      } catch (err) {
+        const adsMessage = err.errors?.map((e) => e.message).join('; ') || err.message;
+        throw new ApiError(status.BAD_GATEWAY, adsMessage || 'Failed to update campaign status in Google Ads');
+      }
+    }
+
+    campaign.status = newStatus;
+    await campaign.save();
+    return campaign;
+  };
+
   const deleteCampaignById = async (campaignId) => {
     const campaign = await Campaign.deleteOne({ _id: campaignId });
     return campaign;
@@ -245,17 +281,20 @@ Return strictly and only a raw JSON object with the following keys:
 
   let result;
   try {
-    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-      model: "gpt-4",
+    const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+      model: process.env.OPENROUTER_MODEL || 'anthropic/claude-3.5-sonnet',
       messages: [
         { role: "system", content: "You are a digital marketing assistant specializing in Google Ads." },
         { role: "user", content: prompt }
       ],
-      temperature: 0.7
+      temperature: 0.7,
+      max_tokens: Number(process.env.OPENROUTER_MAX_TOKENS) || 4096
     }, {
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.OPENROUTER_SITE_URL || '',
+        'X-Title': process.env.OPENROUTER_SITE_NAME || ''
       }
     });
 
@@ -290,7 +329,9 @@ Return strictly and only a raw JSON object with the following keys:
 module.exports = {
   createCampaign,
   getCampaigns,
+  getCampaignById,
   updateCampaignById,
+  setCampaignStatus,
   deleteCampaignById,
   generateGoogleAdsCampaign,
   exportToCsv

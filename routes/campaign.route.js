@@ -15,6 +15,7 @@ router.post('/sync-metrics', auth(), campaignController.syncMetrics);
 router.get('/:userId', auth(), validate(campaignValidation.getCampaigns), campaignController.getCampaigns);
 router.get('/:campaignId', auth(), validate(campaignValidation.getCampaign), campaignController.getCampaign);
 router.put('/:campaignId', auth(), validate(campaignValidation.updateCampaign), campaignController.updateCampaign);
+router.patch('/:campaignId/status', auth(), validate(campaignValidation.updateCampaignStatus), campaignController.updateCampaignStatus);
 router.delete('/:campaignId', auth(), validate(campaignValidation.deleteCampaign), campaignController.deleteCampaign);
 router.post('/export-csv', auth(), validate(campaignValidation.exportToCsv), campaignController.exportToCsv)
 
